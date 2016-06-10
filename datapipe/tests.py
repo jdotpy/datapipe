@@ -10,6 +10,6 @@ class CoreTest(unittest.TestCase):
                'protocol': 'tcp',
                'port': 5000
             }),
-           cs.LoggingConsumer('logger')
+           cs.ConsoleConsumer('logger')
         ])
         pipe.run()
