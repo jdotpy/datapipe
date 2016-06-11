@@ -9,7 +9,7 @@ class NetworkProducer(BaseComponent):
     TCP = 'tcp'
     UDP = 'udp'
 
-    def configure(self, protocol=TCP, host=None, port=None):
+    def configure(self, protocol=TCP, host='127.0.0.1', port=None):
         if protocol == self.TCP:
             self.ServerClass = TCPNetworkServer
         elif protocol == self.UDP:
@@ -25,7 +25,19 @@ class NetworkProducer(BaseComponent):
         self.event({'client': client, 'payload': payload})
 
 class NetworkConsumer(BaseComponent):
-    pass
+    def configure(self, protocol=TCP, host=None, port=None):
+        if protocol == self.TCP:
+            self.ClientClass = TCPNetworkServer
+        elif protocol == self.UDP:
+            self.ClientClass = UDPNetworkServer
+        self.host = host
+        self.port = port
+
+    def consume(self):
+        server = self.ClientClass(self.host, self.port)
+        while True:
+            event = self.queue.get()
+            self.server
 
 class TriggerWebhookConsumer(BaseComponent):
     pass

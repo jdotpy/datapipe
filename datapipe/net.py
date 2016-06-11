@@ -1,5 +1,5 @@
-from threading import Lock
 import socketserver
+import threading
 import socket
 
 ### Raw Section - Incomplete, use below sections instead for now ###
@@ -57,6 +57,7 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
 class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     pass
+
 class NSTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         receive_size = self.network_server.options['receive_size']
@@ -90,14 +91,11 @@ class NetworkServer():
         self.host = host
         self.port = port
         self.options = self.default_options.copy()
-        self.options.update(options)
-        self.event_lock = Lock()
+        self.event_lock = threading.Lock()
 
-        if server:
-            self.server = server or self.server
-        if handler:
-            self.handler = handler or self.handler
-        self.handler = self._configure_handler(handler)
+        self.server = server or self.server
+        self.handler = handler or self.handler
+        self.handler = self._configure_handler(self.handler)
 
         self._connect()
 
@@ -106,9 +104,12 @@ class NetworkServer():
         return ConfiguredHandler
 
     def _connect(self):
+        print('setuping upp server')
         self.net = self.server((self.host, self.port), self.handler)
+        print('done setting up')
 
     def listen(self):
+        print('Listening forever on ', self.host, self.port)
         self.net.serve_forever()
 
     def handle(self, client, payload):
@@ -138,16 +139,31 @@ class BaseNetworkClient():
                 self.callback(payload)
 
 class TCPNetworkClient(BaseNetworkClient):
-    def _connect(self, callback):
+    def _connect(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.host, self.port))
+        self._socket.connect((self.host, self.port))
 
     def send(self, payload):
-        self._socket.sendall(payload)
+        try:
+            self._socket.sendall(payload)
+        except BrokenPipeError:
+            self._socket.close()
+            self._connect()
+            self._socket.sendall(payload)
+
+    def close(self):
+        self._socket.close()
 
 class UDPNetworkClient(BaseNetworkClient):
     def _connect(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def send(self, payload):
-        self._socket.sendto(payload, (self.host, self.port))
+        try:
+            self._socket.sendto(payload, (self.host, self.port))
+        except BrokenPipeError:
+            self._socket.close()
+            self._socket.sendto(payload, (self.host, self.port))
+
+    def close(self):
+        self._socket.close()

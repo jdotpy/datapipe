@@ -1,4 +1,4 @@
-import multiprocessing
+from queue import Queue
 import threading
 import time
 import sys
@@ -33,10 +33,10 @@ class BaseEvent():
                 self.size()
             )
 
-
 class BaseComponent():
     consumer = False
     producer = False
+    targets = None
     Event = BaseEvent
 
     def __init__(self, key, config=None, target=None, event=None):
@@ -49,7 +49,7 @@ class BaseComponent():
             self.queue = self._create_queue()
 
     def _create_queue(self):
-        return multiprocessing.Queue()
+        return Queue()
 
     def event(self, payload):
         event = self.Event(payload, creator=self)
@@ -64,17 +64,15 @@ class BaseComponent():
     def consume(self):
         raise NotImplementedError('Please override the consume method on all consumers.')
 
-
 class ComponentWorker():
     def __init__(self, components):
-        self.mp = multiprocessing.get_context('fork')
         self.components = components
         self.process = None
         self.threads = None
 
     def run(self):
-        self.process = self.mp.Process(target=self.run_component_threads)
-        self.process.start()
+        self.worker_thread = threading.Thread(target=self.run_component_threads)
+        self.worker_thread.start()
 
     def _launch_thread(self, target):
         thread = threading.Thread(target=target)
@@ -89,10 +87,14 @@ class ComponentWorker():
 
         self.threads = []
         for component in self.components:
-            if component.consumer: 
-                self._launch_thread(component.consume)
-            if component.producer: 
-                self._launch_thread(component.produce)
+            if component.targets:
+                for target in component.targets
+                    self._launch_thread(getattr(component, target))
+            else:
+                if component.consumer: 
+                    self._launch_thread(component.consume)
+                if component.producer: 
+                    self._launch_thread(component.produce)
         self.threads[0].join()
 
 class DataPipe():
@@ -108,6 +110,7 @@ class DataPipe():
         for component in self.components[::-1]:
             if next_one:
                 component.target = next_one.queue
+            next_one = component
 
     def run(self, block=True):
         if len(self.components) == 0:
